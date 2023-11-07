@@ -1,0 +1,1 @@
+This is where you would place your merchant validation file from Apple.

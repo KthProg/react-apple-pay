@@ -1,0 +1,31 @@
+{
+  "name": "react-apple-pay",
+  "version": "1.0.0",
+  "description": "Fully-functional implementation of Apple Pay using both the ApplePay JS SDK, and the PaymentRequest API as a fallback.",
+  "main": "index.js",
+  "dependencies": {
+    "@material-ui/core": "^4.12.4",
+    "@material-ui/styles": "^4.11.5",
+    "clsx": "^2.0.0",
+    "next": "^14.0.1",
+    "node-fetch": "^2.7.0",
+    "react": "^18.2.0"
+  },
+  "devDependencies": {
+    "@types/applepayjs": "^14.0.3",
+    "@types/node": "^20.8.10"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/KthProg/react-apple-pay.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/KthProg/react-apple-pay/issues"
+  },
+  "homepage": "https://github.com/KthProg/react-apple-pay#readme"
+}
