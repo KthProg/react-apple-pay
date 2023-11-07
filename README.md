@@ -28,3 +28,23 @@ the trouble.
 12. Deploy the code and verify your domain (Must be HTTPS to work)
 13. You should now be ready to use Apple Pay
 14. Testing should be done in Safari on a Mac or iPhone
+
+# Set up sandbox testers
+See this link: https://developer.apple.com/apple-pay/sandbox-testing/
+You need to set up an unused email as a sandbox tester in App Store Connect, then you log in as this user on 
+your Apple device, and add one of the payment methods given in the link to your wallet. You may need to try 
+several cards, many do not work.
+
+# Documentation I found helpful
+https://developer.apple.com/documentation/apple_pay_on_the_web/apple_pay_js_api/requesting_an_apple_pay_payment_session
+https://developer.apple.com/documentation/apple_pay_on_the_web/apple_pay_js_api/creating_an_apple_pay_session
+https://developer.apple.com/documentation/apple_pay_on_the_web/payment_request_api/setting_up_the_payment_request_api_to_accept_apple_pay
+https://developer.apple.com/apple-pay/sandbox-testing/
+https://webkit.org/blog/8182/introducing-the-payment-request-api-for-apple-pay/
+https://developer.apple.com/documentation/apple_pay_on_the_web/displaying_apple_pay_buttons_using_css
+https://developer.cybersource.com/content/dam/docs/cybs/en-us/apple-pay/developer/fdiglobal/rest/applepay.pdf
+
+The last link is pertinent only to using CyberSource, but they have instructions for CyberSource decryption (you generate the CSR on their website), vs
+merchant decryption (you generate your own CSR and will need to use the private key to decrypt the payment data).
+
+Hopefully, these steps are fairly similar between payment processors.
