@@ -4,6 +4,14 @@ Fully-functional implementation of Apple Pay using both the ApplePay JS SDK, and
 # NOTE
 This does not work or build yet. I'm working on it but it's a free-time endeavor for me.
 
+# How to read this code
+You'll want to look mainly at ApplePayButton.tsx. This component pulls in the services for both ApplePayJS SDK, and the Payment Request API.
+
+These services are very similar, other than the types they use when handling callbacks / initializing the payments. There's not a whole lot more 
+to it than handling callbacks and updating the data shown on the payment sheet. The setup on Apple is the most challenging part really, and 
+the random errors you'll encounter with no expanation. However, I know that the configuration given here works, so hopefully I can save you 
+the trouble.
+
 # STEPS
 
 1. Create a merchant ID in Apple Pay
