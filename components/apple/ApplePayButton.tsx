@@ -3,9 +3,12 @@ import clsx from 'clsx';
 import { isError } from 'helpers/errors';
 import { ServiceContext } from 'providers/ServiceProvider/ServiceProvider';
 import 'react';
-import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { useCallback, useContext, useMemo, useState } from 'react';
 import { ApplePayPaymentMethodData, ApplePayPaymentDetailsInit } from 'services/interfaces/applePayPaymentRequestService';
 import ApplePayLogo from 'assets/icons/apple-pay.svg';
+import { ShippingMethod } from 'models/shippingMethod';
+import { Cart, CartLineItem } from 'models/cart';
+import { SupportsApplePayContext } from 'providers/SupportsApplePayProvider/SupportsApplePayProvider';
 
 interface ApplePayButtonProps {
   doShowCheckoutText?: boolean;
@@ -73,30 +76,21 @@ const ApplePayButton = ({
   const [errorMessage, setErrorMessage] = useState('');
 
   const applePayMerchantId = ''; // your merchant id here
-
-  const cart = {}; // TODO: your actual cart here
-
+  const applePayDomain = ''; // your apple pay domain here
+  const cart = {} as Cart; // your actual cart here
   const cartTotal = 125; // your cart total here
-
-  const lineItems = []; // your line items here
-
+  const lineItems: CartLineItem[] = []; // your line items here
   const selectedShippingMethodId = '1'; // your selected shipping method id here
+  const shippingMethods: ShippingMethod[] = []; // your available shipping methods
 
-  const shippingMethods = []; // TODO: your available shipping methods
-
-  const supportsPaymentRequestApi = useMemo(() => {
-    return 'PaymentRequest' in window && !!window.PaymentRequest;
-  }, []);
-
-  const supportsApplePaySdk = useMemo(() => {
-    return 'ApplePaySession' in window && !!window.ApplePaySession;
-  }, []);
-
-  const [canMakePaymentsWithPaymentRequestApi, setCanMakePaymentsWithPaymentRequestApi] = useState(
-    false,
-  );
-
-  const { applePayPaymentRequestService, applePaySdkService } = useContext(ServiceContext);
+  const { applePayPaymentRequestService, applePaySdkService, applePayCommonService } = useContext(ServiceContext);
+    const {
+    canMakePaymentsWithPaymentRequestApi,
+    // @ts-ignore //
+    isSupported,
+    supportsApplePaySdk,
+    supportsPaymentRequestApi,
+  } = useContext(SupportsApplePayContext);
 
   const paymentMethodData: ApplePayPaymentMethodData = useMemo(
     () => ({
@@ -110,9 +104,17 @@ const ApplePayButton = ({
         version: 3,
         supportedNetworks: ['amex', 'masterCard', 'visa', 'discover'],
         merchantCapabilities: ['supportsEMV', 'supports3DS', 'supportsCredit', 'supportsDebit'],
+        shippingContact:
+          !!cart?.shippingAddress
+            ? applePayCommonService.convertCartAddressToContact(cart.shippingAddress)
+            : undefined,
+        billingContact:
+          !!cart?.billingAddress
+            ? applePayCommonService.convertCartAddressToContact(cart.billingAddress)
+            : undefined,
       },
     }),
-    [applePayMerchantId],
+    [applePayMerchantId, applePayCommonService, cart],
   );
 
   const paymentDetails: ApplePayPaymentDetailsInit = useMemo(
@@ -150,9 +152,38 @@ const ApplePayButton = ({
       },
       supportedNetworks: ['amex', 'masterCard', 'visa', 'discover'],
       merchantCapabilities: ['supportsEMV', 'supports3DS', 'supportsCredit', 'supportsDebit'],
+      shippingContact:
+        !!cart?.shippingAddress
+          ? applePayCommonService.convertCartAddressToContact(cart.shippingAddress)
+          : undefined,
+      billingContact:
+        !!cart?.billingAddress
+          ? applePayCommonService.convertCartAddressToContact(cart.billingAddress)
+          : undefined,
+      shippingMethods: applePaySdkService.convertShippingMethodsToPaymentShippingMethods(
+        shippingMethods,
+      ),
+      applicationData: Buffer.from(applePayDomain).toString('base64'),
     }),
-    [cartTotal, lineItems],
+    [cartTotal, lineItems, applePayCommonService, cart, applePayDomain, shippingMethods],
   );
+
+  const handleError = useCallback((err: unknown) => {
+    if (!isError(err)) {
+      return;
+    }
+
+    if (err.name === 'AbortError' || err.name === 'TypeError' || err.name === 'InvalidStateError') {
+      // these errors give us no meaningful information
+      return;
+    } else if (err.name === 'NotSupportedError') {
+      setErrorMessage('Your device does not support Apple Pay');
+    } else if (err.name === 'SecurityError') {
+      setErrorMessage('Your device has determined that it cannot make a payment securely');
+    } else {
+      setErrorMessage(err.message);
+    }
+  }, [setErrorMessage]);
 
   const handleApplePaySdk = useCallback(async () => {
     // Cannot create an apple pay session unless it's from a click/touch handler,
@@ -170,54 +201,25 @@ const ApplePayButton = ({
       return false;
     }
 
+    applePaySdkService.setOnErrorCallback(handleError);
     applePaySdkService.startSession();
 
     return true;
-  }, [applePaySdkService, setErrorMessage, applePayMerchantId]);
-
-  const paymentRequestSession = useMemo(() => {
-    if (!supportsPaymentRequestApi) {
-      return null;
-    }
-
-    return applePayPaymentRequestService.createSession(paymentMethodData, paymentDetails);
-  }, [
-    paymentMethodData,
-    paymentDetails,
-    applePayPaymentRequestService,
-    supportsPaymentRequestApi,
-  ]);
-
-  useEffect(() => {
-    if (!supportsPaymentRequestApi || !paymentRequestSession) {
-      return;
-    }
-
-    applePayPaymentRequestService.getCanMakePaymentsAsync().then(canMakePayments => {
-      setCanMakePaymentsWithPaymentRequestApi(canMakePayments);
-    });
-  }, [
-    paymentRequestSession,
-    applePayPaymentRequestService,
-    supportsPaymentRequestApi,
-    setCanMakePaymentsWithPaymentRequestApi,
-  ]);
+  }, [applePaySdkService, setErrorMessage, applePayMerchantId, handleError, paymentRequest]);
 
   const handleApplePayPaymentRequest = useCallback(async () => {
     // No need to check if they can make payments or to create a session, as this is done via effects
     // which update the state flags. If they made it to this point, then they can make payments and have an
     // session which they can now start.
 
-    if (!paymentRequestSession) {
-      throw new Error('No Session Created for PaymentRequest API');
-    }
+    applePayPaymentRequestService.createSession(paymentMethodData, paymentDetails);
 
     const paymentResponse = await applePayPaymentRequestService.startSessionAsync();
     if (!paymentResponse) {
       throw new Error('A valid payment response was not received');
     }
     await applePayPaymentRequestService.onPaymentAuthorizedAsync(paymentResponse);
-  }, [paymentRequestSession, applePayPaymentRequestService, setErrorMessage]);
+  }, [paymentMethodData, paymentDetails, applePayPaymentRequestService, setErrorMessage]);
 
   const handleApplePay = useCallback(async () => {
     // button is only available if on eor both payment methods is/are available,
@@ -256,20 +258,7 @@ const ApplePayButton = ({
         );
       }
     } catch (e) {
-      if (!isError(e)) {
-        return;
-      }
-
-      if (e.name === 'AbortError' || e.name === 'TypeError' || e.name === 'InvalidStateError') {
-        // these errors give us no meaningful information
-        return;
-      } else if (e.name === 'NotSupportedError') {
-        setErrorMessage('Your device does not support Apple Pay');
-      } else if (e.name === 'SecurityError') {
-        setErrorMessage('Your device has determined that it cannot make a payment securely');
-      } else {
-        setErrorMessage(e.message);
-      }
+      handleError(e);
     }
   }, [
     handleApplePayPaymentRequest,
@@ -278,21 +267,27 @@ const ApplePayButton = ({
     supportsApplePaySdk,
     supportsPaymentRequestApi,
     canMakePaymentsWithPaymentRequestApi,
+    handleError,
   ]);
+
+  const isApplePaySupported = useMemo(() => {
+    return supportsApplePaySdk ||
+          (supportsPaymentRequestApi && canMakePaymentsWithPaymentRequestApi);
+  }, [supportsApplePaySdk, supportsPaymentRequestApi, canMakePaymentsWithPaymentRequestApi]);
+
+  const isCartReady = useMemo(() => {
+    return shippingMethods.length > 0 && cartTotal > 0;
+  }, [shippingMethods, cartTotal]);
 
   return (
     <div
       className={clsx(classes.root, {
-        [classes.disabled]: !(
-          supportsApplePaySdk ||
-          (supportsPaymentRequestApi && canMakePaymentsWithPaymentRequestApi)
-        ),
+        [classes.disabled]: !isApplePaySupported
       })}
       onClick={onClick ? onClick : undefined}
     >
       <div className={classes.wrapper}>
-        {supportsApplePaySdk ||
-        (supportsPaymentRequestApi && canMakePaymentsWithPaymentRequestApi) ? (
+        {isApplePaySupported&& isCartReady ? (
           <button
             onClick={handleApplePay}
             className={clsx(classes.applePayButton, {

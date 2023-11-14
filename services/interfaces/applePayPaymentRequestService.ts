@@ -1,4 +1,4 @@
-import { APPLE_PAY_PAYMENT_METHOD, StartSessionData } from 'constants/apple-pay';
+import { APPLE_PAY_PAYMENT_METHOD } from 'constants/apple-pay';
 import { Cart } from 'models/cart';
 import { ExtendedPaymentDetailsInit, ExtendedPaymentShippingOption } from 'models/payment/paymentDetails';
 import { ShippingMethod } from 'models/shippingMethod';
@@ -65,8 +65,7 @@ export interface IApplePayPaymentRequestService {
   convertCartToTotal(cart: Cart): PaymentItem;
   createSession(
     paymentDetailsModifier: ApplePayPaymentMethodData,
-    paymentDetails: ApplePayPaymentDetailsInit,
-    startSessionData: StartSessionData,
+    paymentDetails: ApplePayPaymentDetailsInit
   ): void;
   startSessionAsync(): Promise<PaymentResponse | null>;
   onPaymentMethodChanged(event: Event): void;

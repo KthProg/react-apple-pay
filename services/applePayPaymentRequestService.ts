@@ -17,6 +17,9 @@ import { createPaymentRequest } from 'helpers/apple/paymentRequest';
  * Service for handling apple pay requests via the PaymentRequest API standard
  */
 export class ApplePayPaymentRequestService implements IApplePayPaymentRequestService {
+  // @ts-ignore //
+  constructor(private applePayCommonService: IApplePayCommonService) {}
+  
   convertShippingMethodsToPaymentShippingMethods(
     shippingMethods: ShippingMethod[],
     selectedShippingMethodId?: string,

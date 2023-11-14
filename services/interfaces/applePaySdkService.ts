@@ -1,8 +1,8 @@
-import { StartSessionData } from 'constants/apple-pay';
 import { Cart } from 'models/cart';
 import { ShippingMethod } from 'models/shippingMethod';
 
 export interface IApplePaySDKService {
+  setOnErrorCallback(callback: (err: unknown) => void): void;
   convertShippingMethodsToPaymentShippingMethods(
     shippingMethods: ShippingMethod[],
   ): ApplePayJS.ApplePayShippingMethod[];
@@ -10,8 +10,7 @@ export interface IApplePaySDKService {
   convertCartToTotal(cart: Cart): ApplePayJS.ApplePayLineItem;
   createSession(
     version: number,
-    paymentRequest: ApplePayJS.ApplePayPaymentRequest,
-    data: StartSessionData,
+    paymentRequest: ApplePayJS.ApplePayPaymentRequest
   ): void;
   getLatestSupportedVersion(): number;
   getCanMakePaymentsWithActiveCardAsync(merchantId: string): Promise<boolean>;
