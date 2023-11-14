@@ -168,10 +168,11 @@ export class ApplePayPaymentRequestService implements IApplePayPaymentRequestSer
       return {};
     }
 
+    // @ts-ignore //
     const newCartShippingAddress = this.convertPaymentAddressToCartAddress(address);
 
     let cart = null;
-    let shippingMethods = [];
+    let shippingMethods: ShippingMethod[] = [];
 
     try {
       // TODO: call your set shipping address endpoint
@@ -212,9 +213,10 @@ export class ApplePayPaymentRequestService implements IApplePayPaymentRequestSer
     evt.updateWith(updatesPromise);
   }
 
+  // @ts-ignore //
   async updateCartWithShippingIdAsync(id: string): Promise<ExtendedPaymentDetailsUpdate> {
     let cart = null;
-    let shippingMethods = [];
+    let shippingMethods: ShippingMethod[] = [];
 
     try {
       // TODO: call your set shipping method endpoint
@@ -267,8 +269,15 @@ export class ApplePayPaymentRequestService implements IApplePayPaymentRequestSer
 
     // const req = evt.target as ExtendedPaymentRequest;
 
-    // TODO: call your merchant validation endpoint
-    const merchantSessionPromise = validateMerchant({ url: evt.validationURL });
+    const merchantSessionPromise = fetch('/api/apple/validate-merchant', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        url: evt.validationURL
+      })
+    });
     evt.complete(merchantSessionPromise);
   }
 
@@ -279,6 +288,7 @@ export class ApplePayPaymentRequestService implements IApplePayPaymentRequestSer
     }
 
     try {
+      // @ts-ignore //
       const paymentData = {
         applePayToken: Buffer.from(
           JSON.stringify(paymentResponse.details.token.paymentData),
@@ -292,7 +302,16 @@ export class ApplePayPaymentRequestService implements IApplePayPaymentRequestSer
         ),
       };
 
-      // TODO: send payment data token to your payment completion endpoint / payment processor
+      // @ts-ignore //
+      const paymentResult = await fetch('/api/apple/process/payment', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify(paymentData),
+      });
+
+      // TODO: process the payment result
     } catch (ex) {
       await paymentResponse.complete('fail');
       throw ex;
