@@ -13,6 +13,9 @@ import { ShippingMethod } from 'models/shippingMethod';
 import { ExtendedPaymentDetailsUpdate, ExtendedPaymentShippingOption } from 'models/payment/paymentDetails';
 import { createPaymentRequest } from 'helpers/apple/paymentRequest';
 
+/**
+ * Service for handling apple pay requests via the PaymentRequest API standard
+ */
 export class ApplePayPaymentRequestService implements IApplePayPaymentRequestService {
   convertShippingMethodsToPaymentShippingMethods(
     shippingMethods: ShippingMethod[],

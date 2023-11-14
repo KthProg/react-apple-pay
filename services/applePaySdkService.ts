@@ -1,18 +1,26 @@
-import validateMerchant from 'api/apple/validate-merchant';
 import { ShippingMethod } from 'models/shippingMethod';
-import { isError } from 'util';
 import { Cart, CartShippingAddress } from '../models/cart';
 import { IApplePaySDKService } from './interfaces/applePaySdkService';
+import { isError } from 'helpers/errors';
+import { APPLE_PAY_LATEST_VERSION, APPLE_PAY_EARLIEST_VERSION } from 'constants/apple-pay';
 
 const AppleNoOp = (_event: ApplePayJS.Event) => {
   return;
 };
 
-// always starts from 3 = latest to 1 = oldest
-const APPLE_PAY_LATEST_VERSION = 3;
-
+/**
+ * Service for handling apple pay requests via the ApplePay JS SDK
+ */
 export class ApplePaySDKService implements IApplePaySDKService {
   private session: ApplePaySession | null = null;
+  private version: number = APPLE_PAY_LATEST_VERSION;
+  private onError: ((err: unknown) => void) | null = null;
+
+  // @ts-ignore //
+  constructor(private applePayCommonService: IApplePayCommonService) {}
+  setOnErrorCallback(callback: (err: unknown) => void): void {
+    this.onError = callback;
+  }
 
   convertShippingMethodsToPaymentShippingMethods(
     shippingMethods: ShippingMethod[],
@@ -83,16 +91,23 @@ export class ApplePaySDKService implements IApplePaySDKService {
       return;
     }
 
-    const cart = {} as Cart; // TODO: get current cart
+    const cart = {} as Cart; // TODO: get current cart, set taxes
 
     if (!cart) {
       throw new Error('No cart in session while paying with Apple Pay');
     }
 
-    const newTotal = this.convertCartToTotal(cart);
-    const lineItems = this.convertCartToLineItems(cart);
+    const applePayTotal = this.convertCartToTotal(cart);
+    const applePayLineItems = this.convertCartToLineItems(cart);
 
-    this.session.completePaymentMethodSelection(newTotal, lineItems);
+    if (this.version < APPLE_PAY_LATEST_VERSION) {
+      this.session.completePaymentMethodSelection(applePayTotal, applePayLineItems);
+    } else {
+      this.session.completePaymentMethodSelection({
+        newTotal: applePayTotal,
+        newLineItems: applePayLineItems,
+      });
+    }
   }
 
   convertContactToCartAddress(contact: ApplePayJS.ApplePayPaymentContact): CartShippingAddress {
@@ -118,6 +133,7 @@ export class ApplePaySDKService implements IApplePaySDKService {
       return;
     }
 
+    // @ts-ignore //
     const newCartShippingAddress: CartShippingAddress = this.convertContactToCartAddress(
       event.shippingContact,
     );
@@ -127,7 +143,7 @@ export class ApplePaySDKService implements IApplePaySDKService {
     // TODO: fetch updates shipping methods
 
     const cart = {} as Cart;
-    const shippingMethods = [];
+    const shippingMethods = [] as ShippingMethod[];
 
     if (!cart) {
       throw new Error('No cart returned from tax update request');
@@ -139,15 +155,24 @@ export class ApplePaySDKService implements IApplePaySDKService {
       shippingMethods,
     );
 
-    this.session.completeShippingContactSelection(
-      ApplePaySession.STATUS_SUCCESS,
-      applePayShippingMethods,
-      applePayTotal,
-      applePayLineItems,
-    );
+    if (this.version < APPLE_PAY_LATEST_VERSION) {
+      this.session.completeShippingContactSelection(
+        ApplePaySession.STATUS_SUCCESS,
+        applePayShippingMethods,
+        applePayTotal,
+        applePayLineItems,
+      );
+    } else {
+      this.session.completeShippingContactSelection({
+        newTotal: applePayTotal,
+        newLineItems: applePayLineItems,
+        newShippingMethods: applePayShippingMethods,
+      });
+    }
   }
 
   async onShippingMethodChangedAsync(
+    // @ts-ignore //
     event: ApplePayJS.ApplePayShippingMethodSelectedEvent,
   ): Promise<void> {
     if (!this.session) {
@@ -167,11 +192,18 @@ export class ApplePaySDKService implements IApplePaySDKService {
     const applePayTotal = this.convertCartToTotal(cart);
     const applePayLineItems = this.convertCartToLineItems(cart);
 
-    this.session.completeShippingMethodSelection(
-      ApplePaySession.STATUS_SUCCESS,
-      applePayTotal,
-      applePayLineItems,
-    );
+    if (this.version < APPLE_PAY_LATEST_VERSION) {
+      this.session.completeShippingMethodSelection(
+        ApplePaySession.STATUS_SUCCESS,
+        applePayTotal,
+        applePayLineItems,
+      );
+    } else {
+      this.session.completeShippingMethodSelection({
+        newTotal: applePayTotal,
+        newLineItems: applePayLineItems,
+      });
+    }
   }
 
   async onMerchantValidationAsync(event: ApplePayJS.ApplePayValidateMerchantEvent): Promise<void> {
@@ -179,7 +211,15 @@ export class ApplePaySDKService implements IApplePaySDKService {
       return;
     }
 
-    const merchantSession = await validateMerchant({ url: event.validationURL });
+    const merchantSession = await fetch('/api/apple/validate-merchant', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        url: event.validationURL
+      })
+    });
     this.session.completeMerchantValidation(merchantSession);
   }
 
@@ -188,8 +228,39 @@ export class ApplePaySDKService implements IApplePaySDKService {
       return;
     }
 
-    if (!event.payment.shippingContact || !event.payment.billingContact) {
-      this.session.completePayment(ApplePaySession.STATUS_FAILURE);
+    if (!event.payment.shippingContact) {
+      if (this.version < APPLE_PAY_LATEST_VERSION) {
+        this.session.completePayment(ApplePaySession.STATUS_INVALID_SHIPPING_CONTACT);
+      } else {
+        this.session.completePayment({
+          status: ApplePaySession.STATUS_INVALID_SHIPPING_CONTACT,
+          errors: [
+            new ApplePayError(
+              'shippingContactInvalid',
+              undefined,
+              'Your shipping information is missing',
+            ),
+          ],
+        });
+      }
+      return;
+    }
+
+    if (!event.payment.billingContact) {
+      if (this.version < APPLE_PAY_LATEST_VERSION) {
+        this.session.completePayment(ApplePaySession.STATUS_INVALID_BILLING_POSTAL_ADDRESS);
+      } else {
+        this.session.completePayment({
+          status: ApplePaySession.STATUS_INVALID_BILLING_POSTAL_ADDRESS,
+          errors: [
+            new ApplePayError(
+              'billingContactInvalid',
+              undefined,
+              'Your billing information is missing',
+            ),
+          ],
+        });
+      }
       return;
     }
 
@@ -203,23 +274,43 @@ export class ApplePaySDKService implements IApplePaySDKService {
         billingAddress: this.convertContactToCartAddress(event.payment.billingContact),
       };
 
-      // TODO: send payment data token to your payment completion endpoint / payment processor;
-    } catch (ex) {
-      this.session.completePayment({
-        status: ApplePaySession.STATUS_FAILURE,
-        errors: isError(ex)
-          ? [
-              {
-                code: 'unknown',
-                message: ex.message,
-              },
-            ]
-          : [],
+      // @ts-ignore //
+      const paymentResult = await fetch('/api/apple/process/payment', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify(paymentData),
       });
+
+      // TODO: process the payment result
+    } catch (ex) {
+      if (this.version < APPLE_PAY_LATEST_VERSION) {
+        this.session.completePayment(ApplePaySession.STATUS_FAILURE);
+      } else {
+        this.session.completePayment({
+          status: ApplePaySession.STATUS_FAILURE,
+          errors: isError(ex) ? [new ApplePayError('unknown', undefined, String(ex.message))] : [],
+        });
+      }
+      if (this.onError) {
+        // If there is an error to display, then we abort the payment
+        // and show the page again to display the error.
+        // Otherwise we'll just let the payment sheet show the default
+        // error (which is just a message to "switch payment methods").
+        this.onError(ex);
+        this.endSession();
+      }
       return;
     }
 
-    this.session.completePayment(ApplePaySession.STATUS_SUCCESS);
+    if (this.version < APPLE_PAY_LATEST_VERSION) {
+      this.session.completePayment(ApplePaySession.STATUS_SUCCESS);
+    } else {
+      this.session.completePayment({
+        status: ApplePaySession.STATUS_SUCCESS,
+      });
+    }
   }
 
   onCancel(event: ApplePayJS.Event): void {
@@ -231,14 +322,15 @@ export class ApplePaySDKService implements IApplePaySDKService {
   }
 
   getLatestSupportedVersion(): number {
-    let useVersion = APPLE_PAY_LATEST_VERSION;
-    while (!ApplePaySession.supportsVersion(useVersion)) {
-      --useVersion;
-      if (useVersion === 1) {
+    let version = APPLE_PAY_LATEST_VERSION;
+    // will default to 3 if 1 and 2 are not supported
+    while (version > APPLE_PAY_EARLIEST_VERSION) {
+      if (ApplePaySession.supportsVersion(version)) {
         break;
       }
+      --version;
     }
-    return useVersion;
+    return version;
   }
 
   startSession(): void {
@@ -260,6 +352,8 @@ export class ApplePaySDKService implements IApplePaySDKService {
     this.session.onpaymentmethodselected = AppleNoOp;
     this.session.onpaymentauthorized = AppleNoOp;
     this.session.oncancel = AppleNoOp;
+
+    this.onError = null;
 
     this.session.abort();
 
