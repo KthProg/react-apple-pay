@@ -9,7 +9,7 @@ You'll want to look mainly at ApplePayButton.tsx. This component pulls in the se
 
 These services are very similar, other than the types they use when handling callbacks / initializing the payments. There's not a whole lot more 
 to it than handling callbacks and updating the data shown on the payment sheet. The setup on Apple is the most challenging part really, and 
-the random errors you'll encounter with no expanation. However, I know that the configuration given here works, so hopefully I can save you 
+the random errors you'll encounter with no explanation. However, I know that the configuration given here works, so hopefully I can save you 
 the trouble.
 
 # STEPS
