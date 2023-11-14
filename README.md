@@ -2,7 +2,7 @@
 Fully-functional implementation of Apple Pay using both the ApplePay JS SDK, and the PaymentRequest API as a fallback.
 
 # NOTE
-This does not work or build yet. I'm working on it but it's a free-time endeavor for me.
+This does build or run on its own yet. It's more just for people to copy code out of for their own projects. I'm working on it but it's a free-time endeavor for me.
 
 # How to read this code
 You'll want to look mainly at ApplePayButton.tsx. This component pulls in the services for both ApplePayJS SDK, and the Payment Request API.
