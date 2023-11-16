@@ -42,6 +42,7 @@ https://developer.apple.com/documentation/apple_pay_on_the_web/payment_request_a
 https://developer.apple.com/apple-pay/sandbox-testing/
 https://webkit.org/blog/8182/introducing-the-payment-request-api-for-apple-pay/
 https://developer.apple.com/documentation/apple_pay_on_the_web/displaying_apple_pay_buttons_using_css
+https://applepaydemo.apple.com/
 https://developer.cybersource.com/content/dam/docs/cybs/en-us/apple-pay/developer/fdiglobal/rest/applepay.pdf
 
 The last link is pertinent only to using CyberSource, but they have instructions for CyberSource decryption (you generate the CSR on their website), vs
